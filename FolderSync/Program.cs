@@ -66,22 +66,20 @@ public class Program
 
         var synchronizer = serviceProvider.GetRequiredService<ReplicaSynchronizer>();
 
-        synchronizer.Synchronize(config.SourcePath, config.ReplicaPath);
+        // Run synchronization
+        while (true)
+        {
+            try
+            {
+                synchronizer.Synchronize(config.SourcePath, config.ReplicaPath);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.Message);
+            }
 
-        //// Run synchronization
-        //while (true)
-        //{
-        //    try
-        //    {
-        //        synchronizer.Synchronize(config.SourcePath, config.ReplicaPath);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Log.Error(ex.Message);
-        //    }
-
-        //    // The simpliest way to wait for the next synchronization period. May be replaced with a more sophisticated scheduling mechanism if needed (System.Timers.Timer, Stopwatch, Task.Delay).
-        //    Thread.Sleep(config.SyncPeriodSeconds * 1000);
-        //}
+            // The simpliest way to wait for the next synchronization period. May be replaced with a more sophisticated scheduling mechanism if needed (System.Timers.Timer, Stopwatch, Task.Delay).
+            Thread.Sleep(config.SyncPeriodSeconds * 1000);
+        }
     }
 }
