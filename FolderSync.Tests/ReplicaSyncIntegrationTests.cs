@@ -9,6 +9,7 @@ public class ReplicaSyncIntegrationTests : IDisposable
     private readonly Mock<ILogger<ReplicaSynchronizer>> _loggerMock;
     private readonly SyncConfiguration _config;
     private readonly Md5FileComparer _fileComparer;
+    private readonly ReplicaSynchronizer _synchronizer;
 
     public ReplicaSyncIntegrationTests()
     {
@@ -23,6 +24,7 @@ public class ReplicaSyncIntegrationTests : IDisposable
         Directory.CreateDirectory(_config.SourcePath);
         Directory.CreateDirectory(_config.ReplicaPath);
         _fileComparer = new Md5FileComparer();
+        _synchronizer = new ReplicaSynchronizer(new FileSystem(), _config, _fileComparer, _loggerMock.Object);
     }
 
     public void Dispose()
@@ -42,8 +44,7 @@ public class ReplicaSyncIntegrationTests : IDisposable
         Directory.CreateDirectory(sourceDirectory);
 
         // act
-        var synchronizer = new ReplicaSynchronizer(new FileSystem(), _config, _fileComparer, _loggerMock.Object);
-        synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
+        _synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
 
         // assert
         Assert.True(Directory.Exists(Path.Combine(_config.ReplicaPath, subfolderName)));
@@ -59,8 +60,7 @@ public class ReplicaSyncIntegrationTests : IDisposable
         File.WriteAllText(newFilePath, newFileContent);
 
         // act
-        var synchronizer = new ReplicaSynchronizer(new FileSystem(), _config, _fileComparer, _loggerMock.Object);
-        synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
+        _synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
 
         // assert
         var replicaFile = Path.Combine(_config.ReplicaPath, newFileName);
@@ -83,8 +83,7 @@ public class ReplicaSyncIntegrationTests : IDisposable
         File.WriteAllText(replicaFile, oldFileContent);
 
         // act
-        var synchronizer = new ReplicaSynchronizer(new FileSystem(), _config, _fileComparer, _loggerMock.Object);
-        synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
+        _synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
 
         // assert
         Assert.Equal(newFileContent, File.ReadAllText(replicaFile));
@@ -98,8 +97,7 @@ public class ReplicaSyncIntegrationTests : IDisposable
         var replicaFile = Path.Combine(_config.ReplicaPath, fileName);
 
         // act
-        var synchronizer = new ReplicaSynchronizer(new FileSystem(), _config, _fileComparer, _loggerMock.Object);
-        synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
+        _synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
 
         // assert
         Assert.False(File.Exists(replicaFile));
@@ -114,8 +112,7 @@ public class ReplicaSyncIntegrationTests : IDisposable
         Directory.CreateDirectory(replicaDirectory);
 
         // act
-        var synchronizer = new ReplicaSynchronizer(new FileSystem(), _config, _fileComparer, _loggerMock.Object);
-        synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
+        _synchronizer.Synchronize(_config.SourcePath, _config.ReplicaPath);
 
         // assert
         Assert.False(Directory.Exists(replicaDirectory));

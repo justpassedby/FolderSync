@@ -4,10 +4,10 @@ namespace FolderSync;
 
 public class ReplicaSynchronizer(IFileSystem fileSystem, SyncConfiguration configuration, IFileComparer comparer, ILogger<ReplicaSynchronizer> logger)
 {
-    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));   
+    private readonly IFileSystem _fileSystem = fileSystem;   
     private readonly SyncConfiguration _configuration = configuration; 
-    private readonly ILogger<ReplicaSynchronizer> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IFileComparer _comparer = comparer ?? throw new ArgumentNullException(nameof(comparer)); 
+    private readonly ILogger<ReplicaSynchronizer> _logger = logger;
+    private readonly IFileComparer _comparer = comparer; 
 
     public void Synchronize(string sourceFolder, string replicaFolder)
     {
@@ -60,15 +60,15 @@ public class ReplicaSynchronizer(IFileSystem fileSystem, SyncConfiguration confi
                     var sourceInfo = _fileSystem.GetFileInfo(source);
                     var targetInfo = _fileSystem.GetFileInfo(target);
                     bool areEqual = _configuration.SyncMode == SyncMode.SizeTime ?
-                        // comparing file sizes and last write times for difference
+                        // Comparing file sizes and last write times for difference.
                         sourceInfo.Length == targetInfo.Length && sourceInfo.LastWriteTimeUtc == targetInfo.LastWriteTimeUtc :
-                        // comparing file hashes for content difference
-                        comparer.AreFilesEqual(sourceInfo.FullName, targetInfo.FullName);
+                        // Comparing file hashes for content difference.
+                        _comparer.AreFilesEqual(sourceInfo.FullName, targetInfo.FullName);
                     return !areEqual;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Error checking equality of {source} and {target} files: {ex.Message}");
+                    _logger.LogError(ex, "Error checking equality of {Source} and {Target} files.", source, target);
                     return false;
                 }
             },
@@ -78,7 +78,10 @@ public class ReplicaSynchronizer(IFileSystem fileSystem, SyncConfiguration confi
                 {
                     // Program configuration does not allow to modify read-only files in the replica folder.
                     if (!_configuration.AllowReadonlyModify)
-                        throw new InvalidOperationException($"Cannot modify readonly file {target}");
+                    {
+                        _logger.LogError("Cannot update readonly file {Target}", target);
+                        return;
+                    }
 
                     // Program configuration allows to modify read-only files in the replica folder.
                     _fileSystem.ClearReadonlyAttribute(target);
@@ -92,10 +95,9 @@ public class ReplicaSynchronizer(IFileSystem fileSystem, SyncConfiguration confi
 
     private void DeleteReplicaFiles(string sourceFolder, string replicaFolder)
     {
-        _logger.LogInformation($"Starting to delete files in replica folder {replicaFolder} that do not exist in source folder {sourceFolder}");
         RunSyncOperation(
-            _fileSystem.GetFiles(replicaFolder), // files in the replica folder
-            target => _fileSystem.Combine(sourceFolder, _fileSystem.GetFileName(target)), // corresponding source file path
+            _fileSystem.GetFiles(replicaFolder),
+            target => _fileSystem.Combine(sourceFolder, _fileSystem.GetFileName(target)), 
             (target, source) => !_fileSystem.FileExists(source),
             (target, source) =>
             {
@@ -103,12 +105,14 @@ public class ReplicaSynchronizer(IFileSystem fileSystem, SyncConfiguration confi
                 {
                     // Program configuration does not allow to modify read-only files in the replica folder.
                     if (!_configuration.AllowReadonlyModify)
-                        throw new InvalidOperationException($"Cannot delete readonly file {target}");
+                    {
+                        _logger.LogError("Cannot update readonly file {Target}", target);
+                        return;
+                    }
 
                     // Program configuration allows to modify read-only files in the replica folder.
                     _fileSystem.ClearReadonlyAttribute(target);
                 }
-                _logger.LogInformation($"Deleting file {target}");
                 _fileSystem.DeleteFile(target);
             },
             "Delete file");
@@ -133,7 +137,7 @@ public class ReplicaSynchronizer(IFileSystem fileSystem, SyncConfiguration confi
         Func<string, string> getTargetPath,
         Func<string, string, bool> condition,
         Action<string, string> action,
-        string logMessage)
+        string actionName)
     {
         foreach (var source in sourcePaths)
         {
@@ -143,11 +147,11 @@ public class ReplicaSynchronizer(IFileSystem fileSystem, SyncConfiguration confi
                 try
                 {
                     action(source, target);
-                    _logger.LogInformation($"{logMessage} {target} - success");
+                    _logger.LogInformation("{ActionName} {Target} - success", actionName, target);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"{logMessage} {target} - failed: {ex.Message}");
+                    _logger.LogError(ex, "{ActionName} {Target} - failed", actionName, target);
                 }
             }
         }
